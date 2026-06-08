@@ -1,0 +1,21 @@
+# Offline validation run: map the step<->quality Pareto frontier on the mock
+# backend + copy task. No GPU, no network. Proves the whole machinery works.
+name: mock_steps_pareto
+backend:
+  name: mock
+task:
+  name: copy
+  n_examples: 24
+  seq_len: 12
+search_space:
+  num_steps: [1, 2, 4, 8, 16, 24]
+  unmask_order: [confidence, margin, entropy, random, left_to_right]
+  remask: [false, true]
+proposer:
+  name: grid
+loop:
+  rounds: 10
+  batch_size: 12
+objective: accuracy
+cost: model_calls
+output_dir: runs

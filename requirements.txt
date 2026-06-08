@@ -1,0 +1,11 @@
+# Core (offline pipeline: mock backend + search + agents loop)
+numpy>=1.24
+pyyaml>=6.0
+
+# --- optional extras (install as needed) ---
+# Real LLaDA backend (Phase 2, needs a GPU):
+#   pip install torch transformers datasets accelerate
+# LLM-driven proposer/analyst (the auto-researcher):
+#   pip install anthropic
+# Dev/test:
+#   pip install pytest

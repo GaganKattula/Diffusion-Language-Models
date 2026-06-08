@@ -1,0 +1,31 @@
+# PHASE 2 (real model) — REQUIRES A GPU. Not runnable in the dev sandbox.
+#
+# Searches LLaDA-8B's decoding space on GSM8K. The `gsm8k` task is currently a
+# placeholder (see eval/tasks.py) — wire up the real loader before running this.
+#
+# Run on a GPU box after: pip install torch transformers datasets accelerate
+#   dlm-explore run --config configs/llada_gsm8k.yaml
+name: llada_gsm8k
+backend:
+  name: llada
+  model_name: GSAI-ML/LLaDA-8B-Instruct
+  device: cuda
+  dtype: bfloat16
+task:
+  name: gsm8k
+  n_examples: 100
+  split: test
+search_space:
+  num_steps: [16, 32, 64, 128, 256]
+  unmask_order: [confidence, margin, random, left_to_right]
+  remask: [false, true]
+  block_size: [null, 32, 64]
+proposer:
+  name: local        # hill-climb; swap to "llm" for the auto-researcher
+  objective: accuracy
+loop:
+  rounds: 8
+  batch_size: 4
+objective: accuracy
+cost: model_calls
+output_dir: runs

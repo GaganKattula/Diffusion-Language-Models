@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dlm-explorer"
+version = "0.1.0"
+description = "Agentic auto-research harness for diffusion-LM decoding strategies"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Real model backend (Phase 2). Needs a GPU at runtime.
+llada = ["torch>=2.1", "transformers>=4.44", "datasets>=2.20", "accelerate>=0.33"]
+# Optional LLM-driven proposer/analyst (the "auto-researcher").
+agents = ["anthropic>=0.40"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+dlm-explore = "dlm_explorer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
