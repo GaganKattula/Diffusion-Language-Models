@@ -14,7 +14,10 @@ dependencies = [
 
 [project.optional-dependencies]
 # Real model backend (Phase 2). Needs a GPU at runtime.
-llada = ["torch>=2.1", "transformers>=4.44", "datasets>=2.20", "accelerate>=0.33"]
+# transformers is pinned <5: LLaDA's custom modeling_llada.py targets the 4.x
+# loader; transformers 5.x raises AttributeError: 'LLaDAModelLM' object has no
+# attribute 'all_tied_weights_keys' on from_pretrained.
+llada = ["torch>=2.1", "transformers>=4.44,<5", "datasets>=2.20", "accelerate>=0.33"]
 # Optional LLM-driven proposer/analyst (the "auto-researcher").
 agents = ["anthropic>=0.40"]
 dev = ["pytest>=8.0"]

@@ -60,7 +60,9 @@ PY
 echo
 echo "===== [3/5] install package + inference deps (torch left as-is) ====="
 pip install -q -e .
-pip install -q -U transformers accelerate
+# Pin transformers <5 — LLaDA's custom modeling code targets the 4.x loader.
+# (transformers 5.x: AttributeError 'LLaDAModelLM' has no 'all_tied_weights_keys')
+pip install -q "transformers==4.49.0" accelerate
 echo "installed: $(python -c 'import transformers,accelerate; print("transformers", transformers.__version__, "accelerate", accelerate.__version__)')"
 
 echo
