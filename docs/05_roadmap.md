@@ -16,14 +16,21 @@
       fixed `gen_len`, gold/pred numeric extraction (unit-tested offline).
 - [ ] **Manual de-risk** (`scripts/sweep_steps.py`): hand-sweep `num_steps` on
       ~20 examples and confirm a clean steps↔accuracy curve. ← NEXT
-- [x] Throughput: **example batching** implemented (`decoding/batched.py`):
-      one batched forward per step via `backend.predict_batch`, with the softmax/
-      top-2/entropy reduction done **on-device** (only (B,L) summaries leave the
-      GPU, not (B,L,V)). Bit-identical to the serial sampler on the mock
-      (`tests/test_batched_equiv.py`). Enable via `batch_size` (config) or
-      `--batch` (sweep). **On the GPU, sanity-check batched==serial accuracy once**
-      (run `--batch 1` vs `--batch 8` on a few examples) to confirm LLaDA honours
-      the attention mask under right-padding.
+- [x] On-device per-step reduction (`backend.predict_batch`): GPU top-2/softmax/
+      entropy, only (B,L) summaries leave the GPU. This was the real fix — the old
+      serial path did a full 126k-vocab softmax+sort on CPU each step (effectively
+      hung). `TrialRunner` always uses this path now (fast even at batch_size=1).
+- [x] Example batching (`decoding/batched.py`), bit-identical to serial on the
+      mock (`tests/test_batched_equiv.py`).
+- [x] **GPU finding:** right-padded batching across *unequal* prompt lengths
+      changed LLaDA's outputs (batch1 acc 0.375 vs batch8 0.250 on the same 8 GSM8K
+      examples) — its bidirectional attention does not honour the right-pad
+      attention mask. **Fix:** the runner buckets batches by (gen_len, prompt_len)
+      so every batch is equal-length with NO padding → batched == serial exactly.
+      Net: batching helps little here anyway (≈900-token forwards are already
+      compute-bound), so the on-device reduction is the main win.
+- [ ] (optional) revisit padded batching with correct position_ids / a
+      mask format LLaDA respects, if larger effective batches are ever needed.
 
 Then: `dlm-explore run --config configs/llada_gsm8k.yaml`.
 

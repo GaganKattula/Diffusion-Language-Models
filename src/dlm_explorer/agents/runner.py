@@ -37,12 +37,21 @@ class TrialRunner:
     def _decode_all(self, params: DecodingParams):
         """Return a list of (GenerationResult, Example).
 
-        Groups examples by gen_len (a batch must share gen_len), then chunks each
-        group into batches of `batch_size`.
+        Batches are bucketed by (gen_len, prompt_len) so every sequence in a batch
+        has the SAME length and NO padding is needed. A batched forward over
+        equal-length, all-real-token sequences is identical to N single forwards
+        (attention is within-sequence), which keeps batched == serial exactly on
+        the real model. (Right-padded batching across unequal lengths corrupted
+        LLaDA's bidirectional attention — see docs/05_roadmap.md.)
         """
         out = []
-        by_len = sorted(range(len(self._examples)), key=lambda i: self._examples[i].gen_len)
-        for gen_len, group in groupby(by_len, key=lambda i: self._examples[i].gen_len):
+
+        def key(i):
+            e = self._examples[i]
+            return (e.gen_len, len(e.prompt_ids))
+
+        order = sorted(range(len(self._examples)), key=key)
+        for (gen_len, _plen), group in groupby(order, key=key):
             idxs = list(group)
             for s in range(0, len(idxs), self.batch_size):
                 chunk = idxs[s : s + self.batch_size]
