@@ -1,10 +1,13 @@
 # Phase-2 multi-agent decoding search on LLaDA-8B / GSM8K. REQUIRES A GPU.
 # Run on the pod:  dlm-explore run --config configs/llada_gsm8k.yaml
 #
-# Sized for a tractable FIRST search (~30-40 min on an A100-80GB): the local
-# hill-climb proposer evaluates ~18 configs (6 rounds x 3), each over 20 examples.
-# Scale up (n_examples, rounds, num_steps up to 256, proposer: llm) once the
-# shape looks right.
+# Sized for a tractable FIRST search (~35 min on an A100-80GB): the local
+# hill-climb proposer evaluates ~18 configs (6 rounds x 3), each over 20 examples,
+# single-block only. NOTE: the sampler runs num_steps PER block, so semi-AR
+# (block_size < gen_len) multiplies forwards by the block count (e.g. block_size
+# 32 over gen_len 200 = 7x). Semi-AR is therefore its own later experiment; this
+# run holds block_size=null. Scale up (n_examples, rounds, steps up to 256,
+# proposer: llm, block sizes) once the shape looks right.
 name: llada_gsm8k
 backend:
   name: llada
@@ -21,7 +24,7 @@ search_space:
   num_steps: [16, 32, 64, 128]
   unmask_order: [confidence, margin, entropy, random, left_to_right]
   remask: [false, true]
-  block_size: [null, 32]
+  block_size: [null]      # single-block only for the first pass; semi-AR is a later run
 proposer:
   name: local           # hill-climb around the best; swap to "llm" for the auto-researcher
   objective: accuracy
