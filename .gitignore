@@ -6,6 +6,10 @@ build/
 dist/
 runs/
 *.jsonl
+.env
+.env.*
+*.key
+*.pem
 .venv/
 venv/
 .DS_Store
