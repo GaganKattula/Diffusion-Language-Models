@@ -15,7 +15,7 @@ from itertools import groupby
 from statistics import mean
 from typing import List
 
-from ..decoding import DecodingParams, MaskedDiffusionSampler
+from ..decoding import DecodingParams
 from ..decoding.batched import BatchedSampler
 from ..eval.tasks import Task
 from ..experiment.trial import Trial
@@ -26,20 +26,20 @@ class TrialRunner:
         self.backend = backend
         self.task = task
         self.batch_size = max(1, batch_size)
-        self.sampler = MaskedDiffusionSampler(backend)
-        self.batched = BatchedSampler(backend) if self.batch_size > 1 else None
+        # Always use the batched path (even at batch_size=1) so the per-step
+        # reduction runs through backend.predict_batch — on-device for LLaDA.
+        # The serial MaskedDiffusionSampler does a full-vocab softmax+sort on the
+        # CPU every step, which is fine for the tiny-vocab mock but pathological
+        # for a 126k-vocab real model.
+        self.batched = BatchedSampler(backend)
         self._examples = task.examples()
 
     def _decode_all(self, params: DecodingParams):
-        """Return a list of (GenerationResult, Example), batched if enabled.
+        """Return a list of (GenerationResult, Example).
 
-        Batched decoding groups examples by gen_len (a batch must share gen_len),
-        then chunks each group into batches of `batch_size`.
+        Groups examples by gen_len (a batch must share gen_len), then chunks each
+        group into batches of `batch_size`.
         """
-        if self.batched is None:
-            return [(self.sampler.generate(ex.prompt_ids, ex.gen_len, params), ex)
-                    for ex in self._examples]
-
         out = []
         by_len = sorted(range(len(self._examples)), key=lambda i: self._examples[i].gen_len)
         for gen_len, group in groupby(by_len, key=lambda i: self._examples[i].gen_len):
