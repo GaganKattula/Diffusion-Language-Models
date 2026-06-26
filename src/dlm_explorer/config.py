@@ -45,9 +45,9 @@ class ExperimentConfig:
         spec = dict(self.backend)
         return build_backend(spec.pop("name"), **spec)
 
-    def build_task(self):
+    def build_task(self, backend=None):
         spec = dict(self.task)
-        return build_task(spec.pop("name"), **spec)
+        return build_task(spec.pop("name"), backend=backend, **spec)
 
     def build_space(self) -> SearchSpace:
         return SearchSpace(**self.search_space)
@@ -62,7 +62,7 @@ class ExperimentConfig:
 
     def build_loop(self, on_round=None) -> AutoResearchLoop:
         backend = self.build_backend()
-        task = self.build_task()
+        task = self.build_task(backend)
         space = self.build_space()
         proposer = self.build_proposer(space)
         runner = TrialRunner(backend, task)

@@ -5,25 +5,22 @@
 - [x] Mock backend reproduces the qualitative effects (steps, order, remask).
 - [x] 8 passing tests; end-to-end mock run produces a Pareto frontier.
 
-## Phase 1 — Real model substrate (NEXT, needs a GPU)
-The blocker is hardware only — the dev sandbox has no GPU/CUDA and 15 GB RAM,
-which cannot hold LLaDA-8B. On a GPU box:
+## Phase 1 — Real model substrate (LARGELY DONE on an A100-80GB pod)
+- [x] `bash scripts/pod_setup.sh` installs deps (transformers pinned <5 — 5.x
+      breaks LLaDA's custom modeling code) and runs the smoke test.
+- [x] **Backend verified on the real model** (`scripts/smoke_llada.py`):
+      LLaDA-8B-Base loads, **mask_token_id=126336 confirmed**, vocab_size=126464,
+      `model(...).logits` returns `(L, V)`, and the sampler decoded
+      *"The capital of France is"* → *" Paris."* end-to-end.
+- [x] **GSM8K task implemented** (`eval/tasks.py::Gsm8kTask`): few-shot prompt,
+      fixed `gen_len`, gold/pred numeric extraction (unit-tested offline).
+- [ ] **Manual de-risk** (`scripts/sweep_steps.py`): hand-sweep `num_steps` on
+      ~20 examples and confirm a clean steps↔accuracy curve. ← NEXT
+- [ ] Throughput: add **example batching** (backend.logits over (B,L)) before the
+      full sweep — diffusion has no KV-cache so each step is a full forward;
+      batching examples is the main lever for wall-clock.
 
-1. `pip install -e ".[llada]"` (torch, transformers, datasets, accelerate).
-2. **Verify the checkpoint specifics** in `backends/llada.py`:
-   - mask token id (default 126336 — confirm against the model config),
-   - whether to use `-Base` or `-Instruct` and the chat template,
-   - that `AutoModel(...).logits` is the right forward (some LLaDA releases use a
-     custom class via `trust_remote_code=True`).
-3. **Implement the GSM8K task** in `eval/tasks.py` (`Gsm8kTask`):
-   - load via `datasets.load_dataset("gsm8k", "main")`,
-   - tokenize each question with the LLaDA tokenizer; set a fixed `gen_len`,
-   - score by extracting the final numeric answer (regex on the decoded text).
-4. **Manual de-risk first** (before the agent loop): hand-sweep `num_steps` only
-   on ~100 examples and confirm a clean steps↔accuracy curve. If that plots, the
-   substrate works.
-
-Command once ready: `dlm-explore run --config configs/llada_gsm8k.yaml`.
+Then: `dlm-explore run --config configs/llada_gsm8k.yaml`.
 
 ## Phase 2 — The search & the result
 - [ ] Run the decoding search (start with `proposer: local`, then `proposer: llm`).
