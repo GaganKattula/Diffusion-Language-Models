@@ -20,6 +20,8 @@ dependencies = [
 llada = ["torch>=2.1", "transformers>=4.44,<5", "datasets>=2.20", "accelerate>=0.33"]
 # Optional LLM-driven proposer/analyst (the "auto-researcher").
 agents = ["anthropic>=0.40"]
+# Plotting the shareable result figure (scripts/plot_results.py).
+viz = ["matplotlib>=3.7"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]
