@@ -13,12 +13,26 @@
 set -euo pipefail
 
 MODEL="${MODEL:-GSAI-ML/LLaDA-8B-Base}"
-export HF_HOME="${HF_HOME:-/workspace/hf}"
 
 # Run from the repo root regardless of where this is invoked from.
 cd "$(dirname "$0")/.."
 echo "==> repo: $(pwd)"
 echo "==> branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')  commit: $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
+
+# ---- load .env if present (HF_TOKEN etc.) — kept on the pod, not in the repo ----
+ENV_FILE="${ENV_FILE:-}"
+for cand in "$ENV_FILE" ".env" "/workspace/.env" "../.env"; do
+  [ -n "$cand" ] && [ -f "$cand" ] || continue
+  echo "==> loading env from: $cand"
+  set -a; . "$cand"; set +a
+  break
+done
+# huggingface_hub accepts either name; mirror whichever is set to the other.
+[ -n "${HF_TOKEN:-}" ] && [ -z "${HUGGING_FACE_HUB_TOKEN:-}" ] && export HUGGING_FACE_HUB_TOKEN="$HF_TOKEN"
+[ -n "${HUGGING_FACE_HUB_TOKEN:-}" ] && [ -z "${HF_TOKEN:-}" ] && export HF_TOKEN="$HUGGING_FACE_HUB_TOKEN"
+if [ -n "${HF_TOKEN:-}" ]; then echo "==> HF token: detected (hidden)"; else echo "==> HF token: not found (LLaDA is open, usually fine)"; fi
+
+export HF_HOME="${HF_HOME:-/workspace/hf}"
 echo "==> HF_HOME: $HF_HOME"
 mkdir -p "$HF_HOME"
 
