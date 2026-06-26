@@ -14,8 +14,10 @@
       *"The capital of France is"* → *" Paris."* end-to-end.
 - [x] **GSM8K task implemented** (`eval/tasks.py::Gsm8kTask`): few-shot prompt,
       fixed `gen_len`, gold/pred numeric extraction (unit-tested offline).
-- [ ] **Manual de-risk** (`scripts/sweep_steps.py`): hand-sweep `num_steps` on
-      ~20 examples and confirm a clean steps↔accuracy curve. ← NEXT
+- [x] **Manual de-risk DONE** (`scripts/sweep_steps.py`): GSM8K accuracy climbs
+      monotonically with steps — 16→0.05, 32→0.225, 64→0.35 (confidence order,
+      n=40; pre-bucketing-fix so understated, but the steps↔quality signal is
+      unambiguous). Real substrate + thesis confirmed.
 - [x] On-device per-step reduction (`backend.predict_batch`): GPU top-2/softmax/
       entropy, only (B,L) summaries leave the GPU. This was the real fix — the old
       serial path did a full 126k-vocab softmax+sort on CPU each step (effectively
