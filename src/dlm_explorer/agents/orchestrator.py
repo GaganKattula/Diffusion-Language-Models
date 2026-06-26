@@ -14,6 +14,7 @@ offline and with an LLM in the loop.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
@@ -39,6 +40,7 @@ class AutoResearchLoop:
         store: TrialStore,
         config: LoopConfig | None = None,
         on_round: Optional[Callable[[int, Summary], None]] = None,
+        on_trial: Optional[Callable[[int, int, Trial, float], None]] = None,
     ) -> None:
         self.proposer = proposer
         self.runner = runner
@@ -46,10 +48,12 @@ class AutoResearchLoop:
         self.store = store
         self.config = config or LoopConfig()
         self.on_round = on_round
+        self.on_trial = on_trial  # (n_done, round_idx, trial, elapsed_sec) per config
 
     def run(self) -> Summary:
         history: List[Trial] = self.store.load()  # resume if ledger exists
         seen = {t.trial_id for t in history}
+        n_done = 0
         for r in range(self.config.rounds):
             configs = self.proposer.propose(history, self.config.batch_size)
             if not configs:
@@ -58,10 +62,15 @@ class AutoResearchLoop:
                 tid = Trial.make_id(cfg.to_dict())
                 if tid in seen:
                     continue
+                t0 = time.monotonic()
                 trial = self.runner.run(cfg)
+                elapsed = time.monotonic() - t0
                 self.store.append(trial)
                 history.append(trial)
                 seen.add(tid)
+                n_done += 1
+                if self.on_trial:
+                    self.on_trial(n_done, r, trial, elapsed)
             summary = self.analyst.summarize(history)
             if self.on_round:
                 self.on_round(r, summary)

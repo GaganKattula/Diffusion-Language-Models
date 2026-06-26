@@ -47,10 +47,20 @@ def _cmd_plan(args) -> int:
 def _cmd_run(args) -> int:
     cfg = ExperimentConfig.load(args.config)
 
+    def on_trial(n, r, trial, dt):
+        p = trial.params
+        print(
+            f"  [{n:>3}] r{r} steps={p['num_steps']:>3} order={p['unmask_order']:<13} "
+            f"remask={str(p['remask']):<5} -> acc={trial.metrics['accuracy']:.3f} "
+            f"nfe={trial.metrics['model_calls']:.0f} ({dt:.0f}s)",
+            flush=True,
+        )
+
     def on_round(r, summary):
-        print(f"\n===== round {r} =====\n{summary.text}")
+        print(f"\n===== round {r} summary =====\n{summary.text}\n", flush=True)
 
     loop = cfg.build_loop(on_round=on_round)
+    loop.on_trial = on_trial
     final = loop.run()
     print("\n##### FINAL #####")
     print(final.text)
