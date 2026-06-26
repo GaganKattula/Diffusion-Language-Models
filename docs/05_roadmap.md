@@ -16,9 +16,14 @@
       fixed `gen_len`, gold/pred numeric extraction (unit-tested offline).
 - [ ] **Manual de-risk** (`scripts/sweep_steps.py`): hand-sweep `num_steps` on
       ~20 examples and confirm a clean steps↔accuracy curve. ← NEXT
-- [ ] Throughput: add **example batching** (backend.logits over (B,L)) before the
-      full sweep — diffusion has no KV-cache so each step is a full forward;
-      batching examples is the main lever for wall-clock.
+- [x] Throughput: **example batching** implemented (`decoding/batched.py`):
+      one batched forward per step via `backend.predict_batch`, with the softmax/
+      top-2/entropy reduction done **on-device** (only (B,L) summaries leave the
+      GPU, not (B,L,V)). Bit-identical to the serial sampler on the mock
+      (`tests/test_batched_equiv.py`). Enable via `batch_size` (config) or
+      `--batch` (sweep). **On the GPU, sanity-check batched==serial accuracy once**
+      (run `--batch 1` vs `--batch 8` on a few examples) to confirm LLaDA honours
+      the attention mask under right-padding.
 
 Then: `dlm-explore run --config configs/llada_gsm8k.yaml`.
 

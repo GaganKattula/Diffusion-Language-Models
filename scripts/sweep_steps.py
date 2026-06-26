@@ -33,6 +33,7 @@ def main() -> int:
     ap.add_argument("--gen-len", type=int, default=200)
     ap.add_argument("--order", default="confidence")
     ap.add_argument("--steps", type=int, nargs="+", default=[16, 32, 64, 128])
+    ap.add_argument("--batch", type=int, default=1, help="examples per batched forward")
     args = ap.parse_args()
 
     print(f"loading {args.model} ...", flush=True)
@@ -40,9 +41,9 @@ def main() -> int:
     print("building GSM8K task ...", flush=True)
     task = build_task("gsm8k", backend=backend, n_examples=args.n,
                       n_shot=args.n_shot, gen_len=args.gen_len)
-    runner = TrialRunner(backend, task)
+    runner = TrialRunner(backend, task, batch_size=args.batch)
 
-    print(f"\nGSM8K  n={args.n}  gen_len={args.gen_len}  order={args.order}")
+    print(f"\nGSM8K  n={args.n}  gen_len={args.gen_len}  order={args.order}  batch={args.batch}")
     print(f"{'steps':>6} {'accuracy':>9} {'NFE':>5} {'sec':>7}")
     for s in args.steps:
         t0 = time.time()

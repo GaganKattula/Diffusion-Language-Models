@@ -33,6 +33,7 @@ class ExperimentConfig:
     objective: str = "accuracy"
     cost: str = "model_calls"
     output_dir: str = "runs"
+    batch_size: int = 1   # >1 batches examples per denoising step (real backends)
 
     @classmethod
     def load(cls, path: str | Path) -> "ExperimentConfig":
@@ -65,7 +66,7 @@ class ExperimentConfig:
         task = self.build_task(backend)
         space = self.build_space()
         proposer = self.build_proposer(space)
-        runner = TrialRunner(backend, task)
+        runner = TrialRunner(backend, task, batch_size=self.batch_size)
         analyst = Analyst(self.objective, self.cost)
         store = TrialStore(Path(self.output_dir) / f"{self.name}.jsonl")
         return AutoResearchLoop(

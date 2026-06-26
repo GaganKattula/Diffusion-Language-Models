@@ -29,3 +29,4 @@ loop:
 objective: accuracy
 cost: model_calls
 output_dir: runs
+batch_size: 16        # examples per batched denoising forward (A100-80GB has room)

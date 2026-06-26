@@ -23,7 +23,7 @@ from __future__ import annotations
 import numpy as np
 
 from . import BACKENDS
-from .base import MaskedDiffusionBackend
+from .base import MaskedDiffusionBackend, StepPrediction
 
 DEFAULT_MODEL = "GSAI-ML/LLaDA-8B-Base"
 DEFAULT_MASK_TOKEN_ID = 126336
@@ -61,6 +61,12 @@ class LladaBackend(MaskedDiffusionBackend):
             model_name, trust_remote_code=True, torch_dtype=self._dtype
         ).to(device).eval()
         self.vocab_size = int(self.model.config.vocab_size)
+        # Token used to right-pad batched sequences (attention-masked out anyway).
+        self.pad_token_id = (
+            self.tokenizer.pad_token_id
+            if self.tokenizer.pad_token_id is not None
+            else (self.tokenizer.eos_token_id or 0)
+        )
 
     def encode(self, text: str) -> list[int]:
         return self.tokenizer(text)["input_ids"]
@@ -76,6 +82,46 @@ class LladaBackend(MaskedDiffusionBackend):
             t = torch.tensor(input_ids[None, :], dtype=torch.long, device=self.device)
             out = self.model(t).logits  # (1, L, V)
             return out[0].float().cpu().numpy()
+
+    def predict_batch(self, input_ids, prompt_lens, valid_lens, temperature=0.0, seed=0, step=0):
+        """Batched forward with the reduction done on-device.
+
+        One forward over (B, L); softmax/top-2/entropy/gather run on the GPU and
+        only the (B, L) summaries cross to host — so the (B, L, V) logits never
+        leave the device. Right-padding preserves real-token positions; pad
+        columns are attention-masked out.
+        """
+        torch = self._torch
+        B, L = input_ids.shape
+        with torch.no_grad():
+            t = torch.tensor(input_ids, dtype=torch.long, device=self.device)
+            attn = torch.zeros((B, L), dtype=torch.long, device=self.device)
+            for b in range(B):
+                attn[b, : valid_lens[b]] = 1
+            logits = self.model(t, attention_mask=attn).logits.float()  # (B, L, V)
+            logp = torch.log_softmax(logits, dim=-1)
+            p = logp.exp()
+            top2 = torch.topk(p, 2, dim=-1).values
+            conf = top2[..., 0]
+            margin = top2[..., 0] - top2[..., 1]
+            neg_ent = (p * logp).sum(-1)  # sum p log p  ( = -entropy )
+            cur = p.gather(-1, t.unsqueeze(-1)).squeeze(-1)
+            if temperature > 0:
+                g = torch.Generator(device=self.device)
+                g.manual_seed(int(seed) * 100003 + int(step))
+                pt = torch.softmax(logits / temperature, dim=-1)
+                tok = torch.multinomial(
+                    pt.view(-1, pt.shape[-1]), 1, generator=g
+                ).view(B, L)
+            else:
+                tok = logits.argmax(-1)
+            return StepPrediction(
+                tok.cpu().numpy().astype(np.int64),
+                conf.cpu().numpy().astype(np.float32),
+                margin.cpu().numpy().astype(np.float32),
+                neg_ent.cpu().numpy().astype(np.float32),
+                cur.cpu().numpy().astype(np.float32),
+            )
 
     def describe(self) -> str:
         return f"LladaBackend(model={self.model_name}, mask={self.mask_token_id})"
