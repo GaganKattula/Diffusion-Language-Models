@@ -1,0 +1,43 @@
+# Controlled SELF-CORRECTION experiment: does remasking help, and when?
+# Confidence order, matched remask off/on at 64 and 128 steps, n=100 GSM8K.
+# Gives clean matched pairs (1pp resolution at n=100) to confirm or kill the
+# +0.05 seen at 128/confidence in the first search. ~60 min on an A100-80GB
+# (4 configs; (64+128) x 2 remask x 100 x ~0.094 s).
+#
+#   dlm-explore run --config configs/llada_selfcorrect.yaml
+#   python scripts/plot_results.py --ledger runs/llada_selfcorrect.jsonl
+#
+# To CHARACTERISE the remask knobs, run a follow-up with remask:[true] only and
+# sweep remask_threshold/remask_frac (keeping remask=false out of that grid
+# avoids behaviourally-identical duplicate configs):
+#   remask: [true]
+#   remask_threshold: [0.3, 0.5, 0.7]
+#   remask_frac: [0.25, 0.5]
+name: llada_selfcorrect
+backend:
+  name: llada
+  model_name: GSAI-ML/LLaDA-8B-Base
+  device: cuda
+  dtype: bfloat16
+task:
+  name: gsm8k
+  n_examples: 100
+  n_shot: 4
+  gen_len: 200
+  split: test
+search_space:
+  num_steps: [64, 128]
+  unmask_order: [confidence]
+  remask: [false, true]
+  remask_threshold: [0.5]
+  remask_frac: [0.25]
+  block_size: [null]
+proposer:
+  name: grid            # exhaustive — the 4 matched-pair configs
+loop:
+  rounds: 2
+  batch_size: 8
+objective: accuracy
+cost: model_calls
+output_dir: runs
+batch_size: 8

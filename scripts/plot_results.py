@@ -42,6 +42,8 @@ def main() -> int:
     ap.add_argument("--out", default=None)
     ap.add_argument("--cost", default="model_calls")
     ap.add_argument("--objective", default="accuracy")
+    ap.add_argument("--color-by", default="remask", choices=["remask", "unmask_order"],
+                    help="how to colour the Pareto scatter (left panel)")
     ap.add_argument("--title", default=None)
     args = ap.parse_args()
 
@@ -56,8 +58,22 @@ def main() -> int:
     # --- panel 1: Pareto frontier ---
     xs = [t.metrics[cost] for t in trials]
     ys = [t.metrics[obj] for t in trials]
-    cols = [ON_C if t.params.get("remask") else OFF_C for t in trials]
-    ax1.scatter(xs, ys, c=cols, alpha=0.65, s=45, edgecolor="white", linewidth=0.5, zorder=3)
+
+    if args.color_by == "remask":
+        cols = [ON_C if t.params.get("remask") else OFF_C for t in trials]
+        handles = [
+            Line2D([0], [0], marker="o", color="w", markerfacecolor=OFF_C, label="remask off", ms=8),
+            Line2D([0], [0], marker="o", color="w", markerfacecolor=ON_C, label="remask on", ms=8),
+        ]
+    else:  # color by unmask_order
+        palette = ["#4878a8", "#d9534f", "#5cb85c", "#f0ad4e", "#9b59b6", "#17a2b8"]
+        orders = sorted({t.params.get("unmask_order") for t in trials})
+        cmap = {o: palette[i % len(palette)] for i, o in enumerate(orders)}
+        cols = [cmap[t.params.get("unmask_order")] for t in trials]
+        handles = [Line2D([0], [0], marker="o", color="w", markerfacecolor=cmap[o], label=o, ms=8)
+                   for o in orders]
+
+    ax1.scatter(xs, ys, c=cols, alpha=0.75, s=50, edgecolor="white", linewidth=0.5, zorder=3)
 
     front = pareto_front(trials, cost, obj)
     ax1.plot([t.metrics[cost] for t in front], [t.metrics[obj] for t in front],
@@ -72,11 +88,8 @@ def main() -> int:
     ax1.set_ylabel(obj)
     ax1.set_title("Step ↔ quality Pareto frontier")
     ax1.grid(True, alpha=0.25)
-    ax1.legend(handles=[
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=OFF_C, label="remask off", ms=8),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor=ON_C, label="remask on", ms=8),
-        Line2D([0], [0], color="black", marker="o", label="Pareto frontier"),
-    ])
+    handles.append(Line2D([0], [0], color="black", marker="o", label="Pareto frontier"))
+    ax1.legend(handles=handles, fontsize=8)
 
     # --- panel 2: self-correction matched pairs ---
     index: dict = {}

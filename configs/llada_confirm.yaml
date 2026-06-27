@@ -1,0 +1,36 @@
+# CONFIRM the headline ("unmask order dominates compute") at publishable n.
+# Two orders (confidence vs random) across the full step range, n=100 GSM8K.
+# Produces two Pareto curves; the confidence curve should dominate random
+# everywhere. ~75 min on an A100-80GB (8 configs; sum-of-steps 240 x 2 orders
+# x 100 examples x ~0.094 s/forward).
+#
+#   dlm-explore run --config configs/llada_confirm.yaml
+#   python scripts/plot_results.py --ledger runs/llada_confirm.jsonl --color-by unmask_order
+#
+# To strengthen further: add "margin" to unmask_order, or raise n_examples to 200.
+name: llada_confirm
+backend:
+  name: llada
+  model_name: GSAI-ML/LLaDA-8B-Base
+  device: cuda
+  dtype: bfloat16
+task:
+  name: gsm8k
+  n_examples: 100
+  n_shot: 4
+  gen_len: 200
+  split: test
+search_space:
+  num_steps: [16, 32, 64, 128]
+  unmask_order: [confidence, random]
+  remask: [false]
+  block_size: [null]
+proposer:
+  name: grid            # exhaustive — evaluate the whole 8-config grid
+loop:
+  rounds: 2
+  batch_size: 8         # configs/round; grid (8) is covered in round 0
+objective: accuracy
+cost: model_calls
+output_dir: runs
+batch_size: 8           # eval examples per length-bucketed forward
