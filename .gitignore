@@ -6,6 +6,7 @@ build/
 dist/
 runs/
 *.jsonl
+!results/*.jsonl
 .env
 .env.*
 *.key

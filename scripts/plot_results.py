@@ -53,9 +53,18 @@ def main() -> int:
         return 1
     cost, obj = args.cost, args.objective
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
+    # Matched remask off/on pairs — decides whether we draw the 2nd panel at all.
+    index: dict = {}
+    for t in trials:
+        k = (t.params.get("num_steps"), t.params.get("unmask_order"), t.params.get("block_size"))
+        index.setdefault(k, {})[bool(t.params.get("remask"))] = t.metrics[obj]
+    pairs = sorted((k, v[False], v[True]) for k, v in index.items() if True in v and False in v)
 
-    # --- panel 1: Pareto frontier ---
+    ncols = 2 if pairs else 1
+    fig, axes = plt.subplots(1, ncols, figsize=(13, 5) if ncols == 2 else (7.5, 5.5))
+    ax1 = axes[0] if ncols == 2 else axes
+
+    # --- panel 1: step <-> quality ---
     xs = [t.metrics[cost] for t in trials]
     ys = [t.metrics[obj] for t in trials]
 
@@ -70,35 +79,39 @@ def main() -> int:
         orders = sorted({t.params.get("unmask_order") for t in trials})
         cmap = {o: palette[i % len(palette)] for i, o in enumerate(orders)}
         cols = [cmap[t.params.get("unmask_order")] for t in trials]
-        handles = [Line2D([0], [0], marker="o", color="w", markerfacecolor=cmap[o], label=o, ms=8)
+        handles = [Line2D([0], [0], marker="o", color=cmap[o], label=o, ms=8, lw=2)
                    for o in orders]
 
-    ax1.scatter(xs, ys, c=cols, alpha=0.75, s=50, edgecolor="white", linewidth=0.5, zorder=3)
+    ax1.scatter(xs, ys, c=cols, alpha=0.9, s=55, edgecolor="white", linewidth=0.5, zorder=3)
 
-    front = pareto_front(trials, cost, obj)
-    ax1.plot([t.metrics[cost] for t in front], [t.metrics[obj] for t in front],
-             "-o", color="black", lw=2, ms=6, zorder=4)
-    for t in front:  # annotate frontier points with their step count
-        ax1.annotate(f"{t.params.get('num_steps')}st",
-                     (t.metrics[cost], t.metrics[obj]),
-                     textcoords="offset points", xytext=(4, 6), fontsize=8)
+    if args.color_by == "unmask_order":
+        # one connected curve per order — the diverging-curves story
+        for o in orders:
+            pts = sorted((t.metrics[cost], t.metrics[obj]) for t in trials
+                         if t.params.get("unmask_order") == o)
+            ax1.plot([x for x, _ in pts], [y for _, y in pts], "-",
+                     color=cmap[o], lw=2, zorder=2)
+        ax1.set_title("How you unmask decides whether more steps help")
+    else:
+        front = pareto_front(trials, cost, obj)
+        ax1.plot([t.metrics[cost] for t in front], [t.metrics[obj] for t in front],
+                 "-o", color="black", lw=2, ms=6, zorder=4)
+        for t in front:
+            ax1.annotate(f"{t.params.get('num_steps')}st",
+                         (t.metrics[cost], t.metrics[obj]),
+                         textcoords="offset points", xytext=(4, 6), fontsize=8)
+        handles.append(Line2D([0], [0], color="black", marker="o", label="Pareto frontier"))
+        ax1.set_title("Step ↔ quality Pareto frontier")
 
     ax1.set_xscale("log")
-    ax1.set_xlabel(f"{cost} (NFE, log scale) — lower is cheaper")
+    ax1.set_xlabel(f"{cost} (denoising steps / NFE, log) — lower is cheaper")
     ax1.set_ylabel(obj)
-    ax1.set_title("Step ↔ quality Pareto frontier")
     ax1.grid(True, alpha=0.25)
-    handles.append(Line2D([0], [0], color="black", marker="o", label="Pareto frontier"))
-    ax1.legend(handles=handles, fontsize=8)
+    ax1.legend(handles=handles, fontsize=9)
 
-    # --- panel 2: self-correction matched pairs ---
-    index: dict = {}
-    for t in trials:
-        k = (t.params.get("num_steps"), t.params.get("unmask_order"), t.params.get("block_size"))
-        index.setdefault(k, {})[bool(t.params.get("remask"))] = t.metrics[obj]
-    pairs = sorted((k, v[False], v[True]) for k, v in index.items() if True in v and False in v)
-
+    # --- panel 2: self-correction matched pairs (only when present) ---
     if pairs:
+        ax2 = axes[1]
         labels = [f"{k[0]}·{k[1][:4]}" for k, _, _ in pairs]
         off = [o for _, o, _ in pairs]
         on = [n for _, _, n in pairs]
@@ -114,9 +127,6 @@ def main() -> int:
         ax2.set_xlabel("num_steps · unmask_order")
         ax2.grid(True, axis="y", alpha=0.25)
         ax2.legend()
-    else:
-        ax2.text(0.5, 0.5, "no matched remask on/off pairs yet", ha="center", va="center")
-        ax2.set_title("Self-correction effect")
 
     fig.suptitle(args.title or f"LLaDA decoding search — {Path(args.ledger).stem}", fontweight="bold")
     fig.tight_layout()
